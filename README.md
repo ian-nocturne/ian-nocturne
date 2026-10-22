@@ -13,9 +13,9 @@ Now I build zero-dependency, deterministic guardrails for builders who ship with
 
 | Project | What It Does | Proof / Benchmarks |
 |---|---|---|
-| **[DeltaHarness](https://github.com/ian-nocturne/deltaharness)** | Polyglot AST instruction auditor for `CLAUDE.md`, `AGENTS.md`, `.cursorrules`, and `SKILL.md`. Catches broken paths, renamed `npm/pnpm` scripts, and function signature drift before your agent hallucinates. | **12–230 ms** scan · Caught 5 real drifts in `vercel/ai` & 1 in `anthropics/claude-code` |
-| **VibeRescue (`viberescue`)** | Secret-safe (`ZERO_SECRET_VALUES_INCLUDED`) triage & handoff bundler for stuck vibe-coded apps. Flags missing `.env` keys, exposed `"use client"` secrets, missing Supabase RLS, and competing lockfiles (`npm` vs `pnpm`), then generates `RESCUE_BRIEF.md` + `ONE_PROMPT_RESCUE.md`. | **< 10 ms** local triage · `rawEnvValuesIncluded: false` |
-| **Anti-Slop Ship Gate (`anti-slop`)** | Deterministic UI & copy slop scanner (0–100 score, `Grade A+` to `F`). Strips purple radial blobs, `11.5px` fractional font sizes, emoji UI chrome, blocked mobile zoom, and locks reference-first `DESIGN.md` + `design-tokens.css` (`Linear` / `Toss` / `Stripe`). | Turned a 150-violation `Grade F` dashboard into **`Grade A+ (100/100)`** |
+| **[DeltaHarness](https://github.com/ian-nocturne/deltaharness)** | Polyglot AST instruction auditor for `CLAUDE.md`, `AGENTS.md`, `.cursorrules`, and `SKILL.md`. Catches broken paths, renamed `npm/pnpm` scripts, and function signature drift before your agent hallucinates. | Audited **784 docs / 2,791 refs** across `vercel/ai`, `openai-agents-python`, `AutoGPT`, & `claude-code` · **17 real broken paths caught, 0 false positives** |
+| **VibeRescue (`viberescue`)** | Secret-safe (`ZERO_SECRET_VALUES_INCLUDED`) triage & handoff bundler for stuck vibe-coded apps. Flags missing `.env` keys, exposed `"use client"` secrets, missing Supabase RLS, and competing lockfiles (`npm` vs `pnpm`), then generates `RESCUE_BRIEF.md` + `ONE_PROMPT_RESCUE.md`. | **< 20 ms** local triage · `rawEnvValuesIncluded: false` · `STATIC_CHECKS_PASSED` |
+| **Anti-Slop Ship Gate (`anti-slop`)** | Deterministic UI & copy slop scanner (0–100 score, `Grade A+` to `F`). Strips purple radial blobs, `11.5px` fractional font sizes, emoji UI chrome, blocked mobile zoom, and locks reference-first `DESIGN.md` + `design-tokens.css` (`Linear` / `Toss` / `Stripe`). | Turned a `Grade F (0/100)` AI-slop SaaS dashboard into **`Grade A+ (100/100, 18.1:1 AAA contrast)`** |
 
 ---
 

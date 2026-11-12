@@ -1,84 +1,152 @@
 # Ian · Nocturne Lab (`@ian-nocturne`)
 
-> **Category sample:** the public-repository numbers below come from 4 repositories pinned at fixed commits (`vercel/ai`, `openai-agents-python`, `AutoGPT`, `claude-code`; 784 docs, 2,745 references, 10 findings). They are not a guarantee for other repositories. "0 false positives" means the 10 findings in this sample were checked by hand.
-
 > **"AI agents are great at writing 1,000 lines in 30 seconds—and terrible at telling you which 3 lines broke your build."**
 
 Off-hours builder running **Nocturne Lab** late at night in Seoul.
 I started building apps with Claude Code, Cursor, and Codex—until an agent cheerfully reported *"All fixed! 🎉"* while leaking a server key into a `"use client"` bundle, breaking my deploy, and painting the UI in unmistakable purple AI slop.
 
-Now I build small, local-first, deterministic infrastructure for builders who ship with more than one AI agent: the **`-let` suite**.
+Underneath, the failure was usually the same one: the agent was acting on something that used to be true. So I build small, local-first, deterministic tools for people who ship with more than one AI agent.
 
-> **Routlet picks the route. Memlet carries the verified context.**
-
----
-
-### The `-let` Agent Infrastructure Suite
-
-| Project | What It Does | Proof / Boundaries |
-|---|---|---|
-| **[Memlet (`memlet`)](https://github.com/ian-nocturne/deltaharness)**<br>*formerly DeltaHarness / Ieum Memory* | **Agent memory that checks whether what it remembers is still true.** Code-anchored, bi-temporal memory and instruction drift guard for coding agents:<br>• Wiki + ledger: `memlet init` writes `.memlet/config.json`, `.memlet/wiki/INDEX.md`, and a local `.memlet/ledger.sqlite3`; `memlet wiki` records human edits to `.memlet/wiki/*.md` as `user_edit` events and stamps each page with an AST status header<br>• AST & signature contract guard: every `file::Symbol` anchor is labeled `active` / `compatible-unverified` (body changed or optional argument added) / `stale` (symbol gone or required arguments changed)<br>• `memlet import`: pulls rules from `CLAUDE.md`, `AGENTS.md`, `.cursorrules`, `.cursor/rules/*.mdc`, `.ai-memory/`, `.claude-mem/` and tags each with its live anchor status<br>• `memlet handover`: signed, <500-token capsule for the next model; only `active` constraints travel, `stale` anchors are quarantined, dead-ends ride along as rejected approaches<br>• Session Delta-Prompting (send only what changed when `coreHash` is unchanged) + 2-Hop PPR recall<br>• 5-factor admission with poisoning quarantine (utility and source trust scored separately)<br>• `memlet check`: static drift audit for `CLAUDE.md`, `AGENTS.md`, `.cursorrules`, `SKILL.md`<br>• `memlet ui`: Nocturne Memory & Routing Inspector, one self-contained HTML page (AST health, benchmark, handover, Routlet matrix)<br>• `memlet pack`: Routlet × Memlet Pro Harness Pack for `nextjs-supabase` / `fastapi-postgres` / `swift-ios` (7 files per stack, SHA-256 manifest) | `memlet check` audited **784 docs / 2,745 refs** across `vercel/ai`, `openai-agents-python`, `AutoGPT`, & `claude-code` · **10 real broken paths caught, 0 false positives in this category sample** · zero external LLM calls on the default path |
-| **Routlet (`routlet`)** | Evidence-based multi-model routing & supervision skill. Refreshes dated model evidence, checks what the host can actually run, proposes performance / balanced / efficiency plans, then supervises the orchestration the user picks. | Recommends; does not inherit execution or billing approval across vendors. Evidence is dated and refreshed, not assumed. |
-| **VibeRescue (`viberescue`)**<br>*Memlet sub-plugin* | Secret-redacted (`SECRET_REDACTED_BUNDLE`) triage & handoff bundler for stuck vibe-coded apps. Flags missing `.env` keys, exposed `"use client"` secrets, missing Supabase RLS, and competing lockfiles (`npm` vs `pnpm`), then generates `RESCUE_BRIEF.md` + `ONE_PROMPT_RESCUE.md`. | **~10–60 ms** local static triage · `rawEnvValuesIncluded: false` · `verifiedOutputClean: true` · `STATIC_CHECKS_PASSED` is a static result, not a live production guarantee |
-| **Anti-Slop Ship Gate (`anti-slop`)**<br>*Memlet sub-plugin* | Deterministic UI & copy slop scanner (0–100 score, `Grade A+` to `F`). Strips purple radial blobs, `11.5px` fractional font sizes, emoji UI chrome, blocked mobile zoom, and locks reference-first `DESIGN.md` + `design-tokens.css` (`Linear` / `Toss` / `Stripe`). | Turned one AI-slop SaaS dashboard (dogfood sandbox) from cleanliness `0/100 (Grade F)` into **`100/100 (Grade A+)`** with 19.06:1 dark / 16.97:1 light button contrast · static checks, single case |
+> **Routlet picks the route. Memlet carries the checked context.**
 
 ---
 
-### 30-Second Quickstart
+## Memlet — agent memory you can re-check
 
-```bash
-pip install git+https://github.com/ian-nocturne/deltaharness.git
+[**Memlet**](https://github.com/ian-nocturne/memlet/tree/v9.3.0) is agent memory you can re-check, delivered when the agent touches the code it is about.
 
-# 1. One-command, zero-daemon setup (.memlet/config.json + .memlet/ledger.sqlite3 + .memlet/wiki/INDEX.md)
-memlet init .
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://github.com/ian-nocturne/memlet)
+[![Python 3.9+](https://img.shields.io/badge/Python-3.9%2B-3776AB.svg)](https://github.com/ian-nocturne/memlet)
+[![Zero Dependencies](https://img.shields.io/badge/Core_Deps-Zero_(Stdlib_Only)-success.svg)](https://github.com/ian-nocturne/memlet)
 
-# 2. Audit CLAUDE.md / AGENTS.md against your real codebase symbols (alias: audit)
-memlet check . --format markdown
+### The problem
 
-# 3. Re-check wiki anchors, refresh per-page AST status headers, and sync page edits into the ledger
-memlet wiki .
+Every project that uses coding agents (Claude Code, Cursor, Codex) keeps a file of rules for them,
+such as `CLAUDE.md`, `AGENTS.md` or `.cursorrules`. The rules describe the code. Then the code
+changes, nobody updates the rules, and the agent keeps following instructions that are no longer
+true. Most memory tools make this worse in one specific way: they keep injecting a memory long
+after the code it describes has changed.
 
-# 4. Import existing CLAUDE.md / .cursorrules / .ai-memory rules, then hand over only what still checks out
-memlet import . --dry-run --format markdown
-memlet handover . --next-step "Finish the refund refactor" --rejected "Retry inside webhook" --format markdown
+### One example: when the code under a rule changes
 
-# 5. Pack a secret-redacted diagnostic brief & one-prompt repair plan (or: memlet rescue .)
-viberescue pack . --write
+Suppose `AGENTS.md` has two billing rules: "Always charge customers through `charge()` in
+`<billing file>`." and "Refunds go through `<billing file>::refund`." Running `memlet init .`
+records a baseline pin for `<billing file>::refund`, and `memlet admin anchors suggest` followed
+by `memlet admin anchors accept --all-unique` anchors the first rule to `<billing file>::charge`
+in `.memlet/config.json` without editing `AGENTS.md`.
 
-# 6. Scan AI UI slop and lock reference-first design tokens (or: memlet anti-slop .)
-anti-slop scan . --format markdown
+Weeks later someone changes `charge(user_id, amount)` to `charge(account_id, amount, currency)`.
+Without a check, an agent still reads both rules as current instructions; with Memlet, the drifted
+rule is set apart everywhere an agent would read it, while the unchanged rule keeps flowing:
 
-# 7. Nocturne Memory & Routing Inspector: one self-contained, escaped HTML page
-#    (AST anchor health, benchmark, handover capsule, Routlet matrix)
-memlet ui .    # writes .memlet/inspector.html (or --output FILE)
+```console
+$ memlet check --changed
+STALE `<billing file>::charge` (signature_drift) — AGENTS.md:2: [suggested anchor] Always charge customers through `charge()` in `<billing file>`.
+ACTIVE `<billing file>::refund` (ast_hash_match) — AGENTS.md:3: Refunds go through `<billing file>::refund`.
 
-# 8. Routlet × Memlet Pro Harness Pack for nextjs-supabase / fastapi-postgres / swift-ios
-#    CLAUDE.md, AGENTS.md, SKILL.md, PITFALLS.md, Routlet preset, design tokens, SHA-256 MANIFEST.json
-memlet pack --stack all --output ./harness-packs
+$ memlet recall "charge a customer"
+### anchored code changed — do not apply without re-reading the rule
+- [Billing] `AGENTS.md:2-2` (sha256 793dc9f2844e) [suggested anchor] [stale: signature_drift]:
+  > - Always charge customers through `charge()` in `<billing file>`.
+
+$ memlet handover . --next-step "Finish the billing refactor"
+### Active constraints (anchored symbols unchanged since pinning)
+- Refunds go through `<billing file>::refund`. (`AGENTS.md:3`)
+### Quarantined stale anchors (not handed over)
+- [suggested anchor] `<billing file>::charge`: signature_drift
 ```
 
-Legacy command names `ieum-memory`, `deltaharness`, and `prism-memory` remain supported as aliases.
+*(Output shortened. `<billing file>` stands for a Python file under an `app` folder, and
+`[suggested anchor]` marks an anchor Memlet proposed and a person accepted without editing the rule file.)*
+
+Lessons from finished sessions follow the same pattern. `memlet learn` and `memlet dream --via claude`
+propose lessons made of the exact transcript lines they came from, and nothing becomes settled
+memory until a person approves it by name (`memlet learn --approve DRM-7306e549ab93 --by "robin"`).
+With opt-in Claude Code hooks (`memlet init . --hooks --guard --capsule`), an approved `BLOCKS`
+prohibition attached to `<billing file>` stops the agent's first edit of that file in a session,
+quotes the lesson and its citation in full, and lets the agent decide whether to repeat the call.
+
+### What Memlet believes, the design, and what is built
+
+Agent memory is converging on three ideas: agents should **dream** over finished sessions to keep
+lessons, memories should form a typed **ontology**, and context should be **disclosed progressively**.
+Memlet adopts all three under one condition:
+
+> **A memory is only worth handing to an agent if it can be re-checked.**
+
+Five design principles follow from that condition:
+
+1. **Every memory has an address you can re-check.** A rule points at `file::symbol` plus a fingerprint; a lesson points at exact transcript lines (with SHA-256) and attached files; unaddressed text is labelled unverified and broken addresses are quarantined.
+2. **The model proposes, code verifies, a person approves.** Deterministic code checks citations, hashes and time order; only a person, by name, can approve or merge lessons, and Memlet changes nothing on its own.
+3. **Quote, never rewrite.** Rules and lessons are carried verbatim as their cited lines rather than model summaries that can drop conditions.
+4. **Four relations are enough.** `GOVERNS`, `SUPERSEDES`, `RESOLVES` and `BLOCKS` join rules, lessons, symbols and files into one graph without a graph database.
+5. **Send little, and say what was left out.** Anything trimmed for budget is counted rather than dropped silently, and file-scoped hooks send the memory for one file when that file is edited.
+
+**What is actually built (9.3.0).** Everything runs locally with the Python standard library and
+SQLite: no daemon and no graph database. Reads, hooks and MCP tools never launch a model; a model
+is called only when you run `memlet dream --via claude`, `memlet admin eval run --via claude` or
+the optional `memlet admin index-build`. Version 9.3.0 includes AST symbol comparison for Python
+(plus opt-in `tree-sitter` for TypeScript and JavaScript), the human-approved lesson queue and
+four-relation graph, opt-in Claude Code hooks (`--hooks`, `--dream`, `--jit`, `--guard`, `--capsule`),
+a 25-tool `memlet-mcp` server for Codex, Cursor and other MCP clients, read-only queue tidying
+(`memlet admin tidy` and `memlet learn --merge`), and Agent Skill export
+(`memlet admin skillbook --write`), with 1,125 unit tests passing on Python 3.9 and 3.13 on macOS.
+
+### What you can do today
+
+| Command | What it does |
+| :--- | :--- |
+| `memlet init` | Record baseline pins in `.memlet/`; add `--hooks` (and `--jit`, `--guard`, `--capsule`) for opt-in Claude Code hooks. |
+| `memlet check` | Audit instruction files and report pinned anchors that went stale; `--changed` checks working tree drift and exits `1` when stale. |
+| `memlet recall "<task>"` | Return rules with anchor status, approved lessons and labelled hints for a task or `--files`. |
+| `memlet handover` | Build a checksummed context capsule of unchanged rules, approved lessons and quarantined stale anchors. |
+| `memlet learn` / `memlet dream` | Queue cited lessons via keyword rules or `--via claude`, approve or merge them with `--by "robin"`, and attach files with `--path`. |
+| `memlet admin graph show <file>` | Show the rules, prohibitions, fixes, replaced instructions and stale anchors attached to a file, anchor or id. |
+| `memlet admin tidy` / `skillbook` | Report candidate merges, file attachments and rule promotions without writing, or write approved lessons to `SKILL.md`. |
+
+### What it does not do
+
+- **Verified means unchanged, not true, and the guard does not judge edits.** Memlet checks that an anchored symbol has not changed since pinning and that a cited transcript line still says what it said; it does not check whether a rule or lesson is true. `--guard` stops the first edit of a file once per session so an approved prohibition is read in full—it cannot tell whether the edit violates it, and `--jit` context arrives with the tool result after the call ran.
+- **Static analysis only, lexical TypeScript/JavaScript by default, and wording-only tidying.** Python anchors use static AST comparison (`getattr`, `exec`, `setattr` and monkeypatching are not evaluated), TypeScript and JavaScript use a lexical scan that is never `active` unless `tree-sitter` is opted in, and `admin tidy` compares word overlap rather than meaning.
+- **One CLI vendor, integrity rather than authentication, and no accuracy claim.** `memlet dream` launches only the `claude` CLI under a claude.ai subscription login (`codex` and `gemini` are refused because neither documents a mode with every tool off), so the default two-vendor agreement produces no hints today. Approvals, checksums and the decision log detect edits rather than proving who acted, Linux, Windows and interactive sessions are untested, and recall quality is not measured for this release (`memlet admin eval` lets you measure it on your own sessions).
+
+### Try it
+
+Requires Python 3.9 or newer:
+
+```bash
+pip install git+https://github.com/ian-nocturne/memlet.git@v9.3.0
+
+memlet init .                        # write .memlet/ baseline pins (safe to re-run)
+memlet check . --format markdown     # audit instruction files and pinned anchors; exits 1 on errors
+memlet recall "refund retry logic"   # rules and approved lessons for a task, with sources
+```
+
+Add `.memlet/` to your `.gitignore` unless you want to share it; the Dream queue and transcript
+snapshots under it hold conversation text. To propose anchors for rules that mention functions
+without `file::symbol` syntax, run `memlet admin anchors suggest`; to preview Claude Code hooks
+without modifying settings, run `memlet init . --hooks --dry-run`.
+
+### Read more
+
+Version 9.3.0 lives at **[github.com/ian-nocturne/memlet, tag `v9.3.0`](https://github.com/ian-nocturne/memlet/tree/v9.3.0)** (Apache-2.0).
+
+Its README walks through session dreaming and the four relations (`Example 2`), the guarded first
+edit (`Example 3`), and merging repeated lessons into an Agent Skill (`Example 4`). It also
+includes the full *From principle to code* table mapping each principle to what is built in 9.3
+and what is weaker than it sounds, setup details for Claude Code hooks and `memlet-mcp`, the
+GitHub Action, and the sealed `memlet admin eval` memory experiment.
 
 ---
 
-### Refactoring & Handover Benchmark (reproducible, 0 LLM calls)
+## Routlet — which model for which job
 
-`memlet benchmark --format markdown` replays 4 small refactors in a temp directory (breaking signature change, optional argument added, file move, cross-vendor handover with 2 recorded dead-ends) and prints the same `resultDigest` on every run.
-
-| Mode | Stale procedures injected | Optional-arg false positives | Handover hazards prevented |
-|---|:---:|:---:|:---:|
-| Raw Markdown (static `CLAUDE.md` / `.cursorrules`) | 100% (3/3) | 0% (0/1) | 0% (0/3) |
-| Unverified Wiki (timestamps, aging, file-exists check) | 66.7% (2/3) | 0% (0/1) | 66.7% (2/3) |
-| Memlet (AST + `reqSigHash` + handover quarantine) | **0% (0/3)** | **0% (0/1)** | **100% (3/3)** |
-
-Four synthetic fixtures built to exercise these specific failure modes; "Unverified Wiki" is a simplified model, not a run of any particular product.
+Evidence-based multi-model routing and supervision skill. It refreshes dated evidence about models, checks what the host can actually run, proposes performance / balanced / efficiency plans, and supervises the one the user picks. It recommends; it never inherits execution or billing approval across vendors.
 
 ---
 
-### House Rules at Nocturne Lab
+### House rules at Nocturne Lab
 
-1. **Never trust agent self-reports.** Only exit codes, verified symbol anchors, and SHA-256 digests count as done.
-2. **A memory is only as good as the code it points to.** If the anchored symbol changed, the memory is `stale` until re-verified.
+1. **Never trust agent self-reports.** Only exit codes, checked code anchors, and SHA-256 digests count as done.
+2. **A memory is only as good as the code it points to.** If the anchored symbol changed, the memory is `stale` until someone re-reads it.
 3. **Keep Mode by default.** If 1 file is broken, do not let the agent "refactor" 14 working files.
-4. **Secret-redacted diagnostic bundles.** Diagnostic bundles record `.env` key names only (`rawEnvValuesIncluded: false`) and recursively scrub known secret token patterns (`verifiedOutputClean: true`) before handoff.
-5. **Zero template slop.** 4-step integer typography, 3-step neutral mineral surfaces, 1px subtle hairlines, and zero emoji buttons.

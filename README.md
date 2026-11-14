@@ -13,7 +13,7 @@ Underneath, the failure was usually the same one: the agent was acting on someth
 
 ## Memlet — agent memory you can re-check
 
-[**Memlet**](https://github.com/ian-nocturne/memlet/tree/v9.4.0) is agent memory you can re-check, delivered when the agent touches the code it is about.
+[**Memlet**](https://github.com/ian-nocturne/memlet/tree/v9.5.0) is agent memory you can re-check, delivered when the agent touches the code it is about.
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://github.com/ian-nocturne/memlet)
 [![Python 3.9+](https://img.shields.io/badge/Python-3.9%2B-3776AB.svg)](https://github.com/ian-nocturne/memlet)
@@ -84,16 +84,18 @@ Five design principles follow from that condition:
 4. **Four relations are enough.** `GOVERNS`, `SUPERSEDES`, `RESOLVES` and `BLOCKS` join rules, lessons, symbols and files into one graph without a graph database.
 5. **Send little, and say what was left out.** Anything trimmed for budget is counted rather than dropped silently, and file-scoped hooks send the memory for one file when that file is edited.
 
-**What is actually built (9.4.0).** Everything runs locally with the Python standard library and
+**What is actually built (9.5.0).** Everything runs locally with the Python standard library and
 SQLite: no daemon and no graph database. Reads, hooks and MCP tools never launch a model; a model
 is called only when you run `memlet dream --via claude` (with or without `--tidy`),
-`memlet admin eval run --via claude` or the optional `memlet admin index-build`. Version 9.4.0
+`memlet admin eval run --via claude` or the optional `memlet admin index-build`. Version 9.5.0
 includes AST symbol comparison for Python (plus opt-in `tree-sitter` for TypeScript and JavaScript),
 the human-approved lesson queue and four-relation graph, opt-in Claude Code hooks (`--hooks`,
 `--dream`, `--jit`, `--guard`, `--capsule`), a 25-tool `memlet-mcp` server for Codex, Cursor and
 other MCP clients, read-only queue tidying (`memlet admin tidy` and `memlet learn --merge`),
 model-proposed same-meaning groups (`memlet dream --tidy`), and Agent Skill export
-(`memlet admin skillbook --write`), with 1,160 unit tests passing on Python 3.9 and 3.13 on macOS.
+(`memlet admin skillbook --write`), with 1,237 unit tests passing on Python 3.9 and 3.13 on macOS.
+Since 9.5 a read does less work: on a repository with 5,000 files, 2,000 rules and 2,000 lessons the
+SessionStart hook prints its context in 3 to 4 seconds instead of running out of its 7-second deadline.
 
 ### What you can do today
 
@@ -118,7 +120,7 @@ model-proposed same-meaning groups (`memlet dream --tidy`), and Agent Skill expo
 Requires Python 3.9 or newer:
 
 ```bash
-pip install git+https://github.com/ian-nocturne/memlet.git@v9.4.0
+pip install git+https://github.com/ian-nocturne/memlet.git@v9.5.0
 
 memlet init .                        # write .memlet/ baseline pins (safe to re-run)
 memlet check . --format markdown     # audit instruction files and pinned anchors; exits 1 on errors
@@ -132,11 +134,11 @@ without modifying settings, run `memlet init . --hooks --dry-run`.
 
 ### Read more
 
-Version 9.4.0 lives at **[github.com/ian-nocturne/memlet, tag `v9.4.0`](https://github.com/ian-nocturne/memlet/tree/v9.4.0)** (Apache-2.0).
+Version 9.5.0 lives at **[github.com/ian-nocturne/memlet, tag `v9.5.0`](https://github.com/ian-nocturne/memlet/tree/v9.5.0)** (Apache-2.0).
 
 Its README walks through session dreaming and the four relations (`Example 2`), the guarded first
 edit (`Example 3`), and merging repeated lessons into an Agent Skill (`Example 4`). It also
-includes the full *From principle to code* table mapping each principle to what is built in 9.4
+includes the full *From principle to code* table mapping each principle to what is built in 9.5
 and what is weaker than it sounds, setup details for Claude Code hooks and `memlet-mcp`, the
 GitHub Action, and the sealed `memlet admin eval` memory experiment.
 
